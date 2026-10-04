@@ -1,74 +1,79 @@
-window.addEventListener('pageshow', async (event) => {
-  const { data: { session } } = await supabase.auth.getSession();
-
-
-  if (session) {
-    window.location.replace('dashboard.html');
-  }
-});
-
-
-if (window.history && window.history.pushState) {
-  window.history.pushState(null, null, window.location.href);
-  window.onpopstate = function () {
-    window.history.pushState(null, null, window.location.href);
-  };
-}
-
 const loginForm = document.getElementById("loginForm");
 const message = document.getElementById("message");
 const showPassword = document.getElementById("showPassword");
-const password = document.getElementById("password");
+const passwordInput = document.getElementById("password");
 
-loginForm.addEventListener("submit", async function(event)
-{
+showPassword.addEventListener("change", () => {
+    passwordInput.type = showPassword.checked ? "text" : "password";
+});
+
+loginForm.addEventListener("submit", async function(event) {
     event.preventDefault();
 
-    const email = document.getElementById("username").value.trim();
-    const pass = password.value;
+    const identifier = document.getElementById("username").value.trim();
+    const pass = passwordInput.value;
     const submitBtn = loginForm.querySelector('button[type="submit"]');
 
-    if(email === "" || pass === "")
-    {
+    if (identifier === "" || pass === "") {
         message.style.color = "red";
         message.textContent = "Fill the Blanks";
         return;
     }
 
     submitBtn.disabled = true;
+    message.textContent = "Logging in...";
+    message.style.color = "#333";
 
-    try
-    {
-        const { error } = await supabaseClient.auth.signInWithPassword({
+    try {
+        const email = await resolveLoginEmail(identifier);
+        if (!email) {
+            submitBtn.disabled = false;
+            message.style.color = "red";
+            message.textContent = "Invalid Username or Password";
+            return;
+        }
+
+        const { data: authData, error: authError } = await supabaseClient.auth.signInWithPassword({
             email: email,
             password: pass
         });
 
-        if(error)
-        {
+        if (authError) {
             submitBtn.disabled = false;
             message.style.color = "red";
 
-            if(error.code === "email_not_confirmed" || error.message === "Email not confirmed")
-            {
+            if (authError.code === "email_not_confirmed" || authError.message === "Email not confirmed") {
                 message.textContent = "Please confirm your email first. Check your inbox.";
-            }
-            else
-            {
+            } else {
                 message.textContent = "Invalid Username or Password";
             }
+            return;
+        }
+
+        const { data: profileData, error: profileError } = await supabaseClient
+            .from('profiles')
+            .select('role')
+            .eq('id', authData.user.id)
+            .single();
+
+        if (profileError) {
+            submitBtn.disabled = false;
+            message.style.color = "red";
+            message.textContent = "Could not fetch user role profile.";
+            console.error(profileError);
             return;
         }
 
         message.style.color = "green";
         message.textContent = "LogIn Successfully";
 
+        const userRole = profileData ? profileData.role : 'jobseeker';
+
         setTimeout(function() {
-            window.location.href = "dashboard.html";
-        }, 1000);
-    }
-    catch(err)
-    {
+            window.location.href = dashboardUrlForRole(userRole);
+        }, 800);
+
+    } catch (err) {
         console.error("Login error:", err);
         submitBtn.disabled = false;
         message.style.color = "red";
@@ -76,12 +81,8 @@ loginForm.addEventListener("submit", async function(event)
     }
 });
 
-showPassword.addEventListener("change", () => {
-    password.type = showPassword.checked ? "text" : "password";
-});
-
 window.addEventListener('pageshow', function (event) {
-  if (event.persisted) {
-    window.location.reload();
-  }
+    if (event.persisted) {
+        window.location.reload();
+    }
 });
