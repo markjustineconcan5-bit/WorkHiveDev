@@ -31,7 +31,7 @@ body{
     box-shadow:0 15px 40px rgba(0,0,0,.15);
 }
 
-/* LEFT SIDE */
+
 
 .left{
     width:45%;
@@ -65,7 +65,7 @@ body{
     max-width:350px;
 }
 
-/* RIGHT SIDE */
+
 
 .right{
     width:55%;
@@ -90,7 +90,6 @@ body{
     margin:8px 0 25px;
 }
 
-/* INPUT */
 
 .input-box{
     position:relative;
@@ -120,7 +119,7 @@ body{
     box-shadow:0 0 8px rgba(255,193,7,.3);
 }
 
-/* PASSWORD */
+
 
 .password-box span{
     position:absolute;
@@ -156,7 +155,6 @@ body{
     cursor:pointer;
 }
 
-/* ROLE */
 
 .roles{
     display:flex;
@@ -201,8 +199,6 @@ body{
     background:#FFF8E1;
 }
 
-/* TERMS */
-
 .terms{
     display:flex;
     align-items:flex-start;
@@ -236,7 +232,6 @@ button:hover{
     transform:translateY(-2px);
 }
 
-/* LOGIN */
 
 .login{
     text-align:center;
@@ -274,7 +269,7 @@ button:hover{
 }
 
 
-/* RESPONSIVE */
+
 
 @media(max-width:900px){
 
