@@ -1,4 +1,3 @@
-
 const signupForm = document.getElementById("signupForm");
 const password = document.getElementById("password");
 const confirmPassword = document.getElementById("confirmPassword");
@@ -121,7 +120,6 @@ signupForm.addEventListener("submit", async function(e){
         return;
     }
 
-    // Password Length
     if(pass.length < 8){
         showError("Password must be at least 8 characters.");
         return;
@@ -215,4 +213,3 @@ signupForm.addEventListener("submit", async function(e){
         showError("Something went wrong. Please try again.");
     }
 });
-
