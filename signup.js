@@ -120,6 +120,7 @@ signupForm.addEventListener("submit", async function(e){
         return;
     }
 
+    // Password Length
     if(pass.length < 8){
         showError("Password must be at least 8 characters.");
         return;
