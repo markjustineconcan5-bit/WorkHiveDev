@@ -1,6 +1,4 @@
-/* =========================================================
-   EMPLOYER DASHBOARD — WorkHive
-========================================================= */
+
 
 let EMPLOYER_PROFILE = null;
 let MY_JOBS = [];
@@ -32,9 +30,7 @@ window.addEventListener("pageshow", async function (event) {
     if (!session) window.location.replace("index.html");
 });
 
-/* =========================
-   VIEW SWITCHING (SPA nav)
-========================= */
+
 function initViewSwitching() {
     function showView(view) {
         document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
@@ -69,16 +65,18 @@ function initDemoButtons() {
     document.querySelectorAll("[data-demo]").forEach(button => {
         button.addEventListener("click", async () => {
             if (button.dataset.demo === "logout") {
-                await supabaseClient.auth.signOut();
-                window.location.href = "index.html";
+                openModal("logoutModal");
             }
         });
     });
+    document.getElementById("confirmLogoutBtn").addEventListener("click", async function () {
+        this.disabled = true;
+        await supabaseClient.auth.signOut();
+        window.location.href = "index.html";
+    });
 }
 
-/* =========================
-   SEARCH
-========================= */
+
 function initSearch() {
     document.querySelectorAll(".search").forEach(input => {
         input.addEventListener("input", () => {
@@ -101,21 +99,25 @@ function initSearch() {
     if (applicantsFilterStatus) applicantsFilterStatus.addEventListener("change", renderApplicants);
 }
 
-/* =========================
-   DATA LOADING
-========================= */
+
 async function loadEmployerData() {
-    const [{ data: jobs }, { data: apps }, { data: convos }] = await Promise.all([
+    const [{ data: jobs, error: jobsErr }, { data: apps, error: appsErr }, { data: convos, error: convosErr }] = await Promise.all([
         supabaseClient.from("jobs").select("*").eq("employer_id", EMPLOYER_PROFILE.id).order("created_at", { ascending: false }),
         supabaseClient.from("applications").select("*, jobs!inner(title, employer_id), profiles!applications_applicant_id_fkey(id, full_name, username, headline)").eq("jobs.employer_id", EMPLOYER_PROFILE.id).order("created_at", { ascending: false }),
         supabaseClient.from("conversations").select("*, profiles!conversations_jobseeker_id_fkey(full_name, username)").eq("employer_id", EMPLOYER_PROFILE.id).order("created_at", { ascending: false })
     ]);
+
+    if (jobsErr) console.error("[jobs]", jobsErr.message);
+    if (appsErr) console.error("[applications]", appsErr.message);
+    if (convosErr) console.error("[conversations]", convosErr.message);
 
     MY_JOBS = jobs || [];
     MY_APPLICATIONS = apps || [];
     MY_CONVERSATIONS = convos || [];
 
     renderStats();
+    renderProfileStats();
+    renderNotifications();
     renderRecentCandidates();
     renderJobs();
     populateJobFilterOptions();
@@ -128,6 +130,39 @@ function renderStats() {
     document.getElementById("statTotalApplicants").textContent = MY_APPLICATIONS.length;
     document.getElementById("statShortlisted").textContent = MY_APPLICATIONS.filter(a => a.status === "shortlisted").length;
     document.getElementById("statInterviews").textContent = MY_APPLICATIONS.filter(a => a.status === "interview").length;
+}
+
+function countStatus(s) { return MY_APPLICATIONS.filter(a => a.status === s).length; }
+
+function renderProfileStats() {
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    set("pfActiveJobs", MY_JOBS.filter(j => j.status === "active").length);
+    set("pfApplicants", MY_APPLICATIONS.length);
+    set("pfInterviews", countStatus("interview"));
+    set("pfHired", countStatus("accepted"));
+
+    // Overview card sub-labels (real numbers instead of fixed text)
+    const pending = countStatus("pending");
+    set("trendActiveJobs", MY_JOBS.length + " total listing" + (MY_JOBS.length === 1 ? "" : "s"));
+    set("trendApplicants", pending + " awaiting review");
+    set("trendShortlisted", "In review pipeline");
+    set("trendInterviews", countStatus("interview") ? "In progress" : "None yet");
+}
+
+function renderNotifications() {
+    const el = document.getElementById("notificationsList");
+    if (!el) return;
+    const items = [];
+    const pending = countStatus("pending");
+    const interviews = countStatus("interview");
+    const shortlisted = countStatus("shortlisted");
+    if (pending) items.push("🔔 " + pending + " new applicant" + (pending === 1 ? "" : "s") + " need" + (pending === 1 ? "s" : "") + " review.");
+    if (interviews) items.push("📅 " + interviews + " applicant" + (interviews === 1 ? " is" : "s are") + " at the interview stage.");
+    if (shortlisted) items.push("★ " + shortlisted + " shortlisted applicant" + (shortlisted === 1 ? "" : "s") + " waiting for your next step.");
+    if (MY_CONVERSATIONS.length) items.push("💬 " + MY_CONVERSATIONS.length + " active conversation" + (MY_CONVERSATIONS.length === 1 ? "" : "s") + ".");
+    const expiring = MY_JOBS.filter(j => j.status === "active" && j.deadline && (new Date(j.deadline) - new Date()) / 86400000 <= 3 && new Date(j.deadline) >= new Date(new Date().toDateString()));
+    expiring.forEach(j => items.push("⏰ \"" + j.title + "\" closes on " + j.deadline + "."));
+    el.innerHTML = items.map(t => '<div class="notice">' + t + '</div>').join("") || '<div class="notice">No new notifications.</div>';
 }
 
 function statusBadgeClass(status) {
@@ -187,13 +222,13 @@ function renderJobs() {
         const job = MY_JOBS.find(j => j.id === btn.dataset.closeJob);
         const newStatus = job.status === "active" ? "closed" : "active";
         const { error } = await supabaseClient.from("jobs").update({ status: newStatus }).eq("id", job.id);
-        if (error) { toast("Could not update job: " + error.message, "error"); return; }
+        if (error) { alert("Could not update job: " + error.message); return; }
         await loadEmployerData();
     }));
     el.querySelectorAll("[data-delete-job]").forEach(btn => btn.addEventListener("click", async () => {
-        if (!(await confirmDialog("Delete this job listing? This cannot be undone."))) return;
+        if (!confirm("Delete this job listing? This cannot be undone.")) return;
         const { error } = await supabaseClient.from("jobs").delete().eq("id", btn.dataset.deleteJob);
-        if (error) { toast("Could not delete job: " + error.message, "error"); return; }
+        if (error) { alert("Could not delete job: " + error.message); return; }
         await loadEmployerData();
     }));
 }
@@ -220,21 +255,32 @@ function renderApplicants() {
             '<td>' + new Date(a.created_at).toLocaleDateString() + '</td>' +
             '<td><span class="badge ' + statusBadgeClass(a.status) + '">' + a.status + '</span></td>' +
             '<td><div class="actions">' +
-                '<button class="btn outline" data-message="' + a.profiles?.id + '">Message</button>' +
-                '<button class="btn primary" data-set-status="interview" data-app-id="' + a.id + '">Interview</button>' +
-                '<button class="btn outline" data-set-status="shortlisted" data-app-id="' + a.id + '">Shortlist</button>' +
-                '<button class="btn danger" data-set-status="rejected" data-app-id="' + a.id + '">Reject</button>' +
+                '<button type="button" class="btn outline" data-message="' + a.applicant_id + '" data-job-id="' + a.job_id + '">Message</button>' +
+                '<button type="button" class="btn primary" data-set-status="interview" data-app-id="' + a.id + '">Interview</button>' +
+                '<button type="button" class="btn outline" data-set-status="shortlisted" data-app-id="' + a.id + '">Shortlist</button>' +
+                '<button type="button" class="btn outline" data-set-status="accepted" data-app-id="' + a.id + '">Hire</button>' +
+                '<button type="button" class="btn danger" data-set-status="rejected" data-app-id="' + a.id + '">Reject</button>' +
             '</div></td>' +
         '</tr>'
     )).join("") || '<tr><td colspan="5" style="padding:20px;text-align:center;color:#888">No applicants match.</td></tr>';
 
     body.querySelectorAll("[data-set-status]").forEach(btn => btn.addEventListener("click", async () => {
-        const { error } = await supabaseClient.from("applications").update({ status: btn.dataset.setStatus }).eq("id", btn.dataset.appId);
-        if (error) { toast("Could not update: " + error.message, "error"); return; }
+        btn.disabled = true;
+        // .select() returns the updated rows, so we can tell when RLS silently blocked the update
+        const { data, error } = await supabaseClient.from("applications")
+            .update({ status: btn.dataset.setStatus })
+            .eq("id", btn.dataset.appId)
+            .select("id, status");
+        if (error) { btn.disabled = false; alert("Could not update: " + error.message); return; }
+        if (!data || !data.length) {
+            btn.disabled = false;
+            alert("The status was not saved. Supabase blocked the update (missing RLS policy). Run fix-messaging-and-applications.sql in the Supabase SQL Editor.");
+            return;
+        }
         await loadEmployerData();
     }));
     body.querySelectorAll("[data-message]").forEach(btn => btn.addEventListener("click", async () => {
-        await openOrCreateConversation(btn.dataset.message);
+        await openOrCreateConversation(btn.dataset.message, btn.dataset.jobId);
         window.showView("messages");
     }));
 }
@@ -247,9 +293,7 @@ function fullName(profile) {
     return (profile && (profile.full_name || profile.username)) || "Applicant";
 }
 
-/* =========================
-   POST JOB FORM
-========================= */
+
 function initJobForm() {
     const jobForm = document.getElementById("jobForm");
     if (!jobForm) return;
@@ -268,18 +312,16 @@ function initJobForm() {
             status: "active"
         });
 
-        if (error) { toast("Could not post job: " + error.message, "error"); return; }
+        if (error) { alert("Could not post job: " + error.message); return; }
 
         closeModal("jobModal");
         jobForm.reset();
         await loadEmployerData();
-        toast("Job posted successfully!");
+        alert("Job posted successfully!");
     });
 }
 
-/* =========================
-   PROFILE
-========================= */
+
 function fillProfileView() {
     const p = EMPLOYER_PROFILE;
     document.getElementById("profileCompanyName").textContent = p.company_name || p.full_name || p.username;
@@ -308,16 +350,16 @@ function initProfileForm() {
             phone: document.getElementById("formPhone").value.trim()
         };
         const { error } = await supabaseClient.from("profiles").update(updates).eq("id", EMPLOYER_PROFILE.id);
-        if (error) { toast("Could not save: " + error.message, "error"); return; }
+        if (error) { alert("Could not save: " + error.message); return; }
         Object.assign(EMPLOYER_PROFILE, updates);
         fillProfileView();
-        toast("Changes saved successfully.");
+        alert("Changes saved successfully.");
     });
 }
 
-/* =========================
-   MESSAGES (real, employer <-> job seeker)
-========================= */
+
+let lastChatKey = "";
+
 function initMessages() {
     const messageForm = document.getElementById("messageForm");
     if (messageForm) {
@@ -325,18 +367,44 @@ function initMessages() {
             event.preventDefault();
             const input = document.getElementById("messageInput");
             const text = input.value.trim();
-            if (!text || !activeConversationId) return;
+            if (!text) return;
+            if (!activeConversationId) { alert("Pick a conversation first, or click Message next to an applicant."); return; }
 
             const { error } = await supabaseClient.from("messages").insert({
                 conversation_id: activeConversationId,
                 sender_id: EMPLOYER_PROFILE.id,
                 body: text
             });
-            if (error) { toast("Could not send: " + error.message, "error"); return; }
+            if (error) { alert("Could not send: " + error.message); return; }
             input.value = "";
+            lastChatKey = "";
             await renderChat();
         });
     }
+    
+    setInterval(pollMessages, 4000);
+}
+
+async function refreshConversations() {
+    const { data, error } = await supabaseClient.from("conversations")
+        .select("*, profiles!conversations_jobseeker_id_fkey(full_name, username)")
+        .eq("employer_id", EMPLOYER_PROFILE.id)
+        .order("created_at", { ascending: false });
+    if (error || !data) return;
+    const changed = data.length !== MY_CONVERSATIONS.length;
+    MY_CONVERSATIONS = data;
+    if (changed) renderConversationList();
+}
+
+async function pollMessages() {
+    if (document.hidden) return;
+    await refreshConversations();
+    const view = document.getElementById("view-messages");
+    if (activeConversationId && view && view.classList.contains("active")) await renderChat();
+}
+
+function seekerName(c) {
+    return c.profiles ? (c.profiles.full_name || c.profiles.username) : "Job Seeker";
 }
 
 function renderConversationList() {
@@ -348,13 +416,12 @@ function renderConversationList() {
     MY_CONVERSATIONS.forEach(c => {
         const div = document.createElement("div");
         div.className = "conversation" + (c.id === activeConversationId ? " active" : "");
-        const name = c.profiles ? (c.profiles.full_name || c.profiles.username) : "Job Seeker";
+        const name = seekerName(c);
         div.innerHTML = '<div class="avatar">' + name.split(" ").map(p => p[0]).slice(0, 2).join("").toUpperCase() + '</div>' +
             '<div><b>' + name + '</b><small>Tap to view conversation</small></div>';
         div.addEventListener("click", () => {
             activeConversationId = c.id;
             renderConversationList();
-            renderChat();
         });
         list.appendChild(div);
     });
@@ -363,6 +430,7 @@ function renderConversationList() {
         list.innerHTML = '<div style="padding:16px;color:#888;font-size:13px">No conversations yet. Message an applicant from the Applications tab.</div>';
     }
 
+    lastChatKey = "";
     renderChat();
 }
 
@@ -371,12 +439,20 @@ async function renderChat() {
     const body = document.getElementById("chatBody");
     if (!head || !body) return;
     const c = MY_CONVERSATIONS.find(x => x.id === activeConversationId);
-    if (!c) { head.innerHTML = ""; body.innerHTML = ""; return; }
+    if (!c) { head.innerHTML = ""; body.innerHTML = ""; lastChatKey = ""; return; }
 
-    const name = c.profiles ? (c.profiles.full_name || c.profiles.username) : "Job Seeker";
-    head.innerHTML = name + "<small>Job Seeker</small>";
+    head.innerHTML = seekerName(c) + "<small>Job Seeker</small>";
 
-    const { data: messages } = await supabaseClient.from("messages").select("*").eq("conversation_id", c.id).order("created_at", { ascending: true });
+    const { data: messages, error } = await supabaseClient.from("messages").select("*").eq("conversation_id", c.id).order("created_at", { ascending: true });
+    if (error) {
+        body.innerHTML = '<div style="padding:16px;color:#c62828;font-size:13px">Could not load messages: ' + error.message + '</div>';
+        return;
+    }
+    
+    const key = c.id + ":" + (messages || []).map(m => m.id).join(",");
+    if (key === lastChatKey) return;
+    lastChatKey = key;
+
     body.innerHTML = "";
     (messages || []).forEach(m => {
         const bubble = document.createElement("div");
@@ -387,15 +463,15 @@ async function renderChat() {
     body.scrollTop = body.scrollHeight;
 }
 
-async function openOrCreateConversation(jobseekerId) {
-    if (!jobseekerId) return;
+async function openOrCreateConversation(jobseekerId, jobId) {
+    if (!jobseekerId || jobseekerId === "undefined" || jobseekerId === "null") return;
     let convo = MY_CONVERSATIONS.find(c => c.jobseeker_id === jobseekerId);
     if (!convo) {
         const { data, error } = await supabaseClient.from("conversations")
-            .insert({ employer_id: EMPLOYER_PROFILE.id, jobseeker_id: jobseekerId })
+            .insert({ employer_id: EMPLOYER_PROFILE.id, jobseeker_id: jobseekerId, job_id: jobId || null })
             .select("*, profiles!conversations_jobseeker_id_fkey(full_name, username)")
             .single();
-        if (error) { toast("Could not start conversation: " + error.message, "error"); return; }
+        if (error) { alert("Could not start conversation: " + error.message); return; }
         MY_CONVERSATIONS.unshift(data);
         convo = data;
     }
