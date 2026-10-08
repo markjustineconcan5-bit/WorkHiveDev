@@ -1,11 +1,28 @@
+window.addEventListener('pageshow', async (event) => {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (session) {
+        const profile = await getCurrentProfile();
+        if (profile) window.location.replace(dashboardUrlForRole(profile.role));
+    }
+});
+
+if (window.history && window.history.pushState) {
+    window.history.pushState(null, null, window.location.href);
+    window.onpopstate = function () {
+        window.history.pushState(null, null, window.location.href);
+    };
+}
+
 const loginForm = document.getElementById("loginForm");
 const message = document.getElementById("message");
 const showPassword = document.getElementById("showPassword");
 const passwordInput = document.getElementById("password");
 
+
 showPassword.addEventListener("change", () => {
     passwordInput.type = showPassword.checked ? "text" : "password";
 });
+
 
 loginForm.addEventListener("submit", async function(event) {
     event.preventDefault();
@@ -25,6 +42,7 @@ loginForm.addEventListener("submit", async function(event) {
     message.style.color = "#333";
 
     try {
+       
         const email = await resolveLoginEmail(identifier);
         if (!email) {
             submitBtn.disabled = false;
@@ -33,6 +51,7 @@ loginForm.addEventListener("submit", async function(event) {
             return;
         }
 
+        
         const { data: authData, error: authError } = await supabaseClient.auth.signInWithPassword({
             email: email,
             password: pass
@@ -44,12 +63,15 @@ loginForm.addEventListener("submit", async function(event) {
 
             if (authError.code === "email_not_confirmed" || authError.message === "Email not confirmed") {
                 message.textContent = "Please confirm your email first. Check your inbox.";
+            } else if (authError.code === "user_banned" || /banned/i.test(authError.message || "")) {
+                message.textContent = "This account has been suspended by the admin.";
             } else {
                 message.textContent = "Invalid Username or Password";
             }
             return;
         }
 
+        
         const { data: profileData, error: profileError } = await supabaseClient
             .from('profiles')
             .select('role')
@@ -67,6 +89,7 @@ loginForm.addEventListener("submit", async function(event) {
         message.style.color = "green";
         message.textContent = "LogIn Successfully";
 
+        
         const userRole = profileData ? profileData.role : 'jobseeker';
 
         setTimeout(function() {
@@ -80,6 +103,7 @@ loginForm.addEventListener("submit", async function(event) {
         message.textContent = "Something went wrong. Please try again.";
     }
 });
+
 
 window.addEventListener('pageshow', function (event) {
     if (event.persisted) {
