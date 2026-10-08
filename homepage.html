@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WorkHive | Official Job Portal</title>
     <link rel="stylesheet" href="homepage.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 </head>
 
 <body>
@@ -22,7 +23,7 @@
                 <a href="#about" onclick="highlightAbout()">About Us</a>
             </nav>
         <div>
-            <a href="index.html" class="btn-signin">Get started</a>
+            <a href="index.html" class="btn-signin" id="headerAuthBtn">Get started</a>
         </div>
     </header>
 
@@ -36,6 +37,14 @@
         <div class="banner-content">
             <h2>Find Your Dream Career Today</h2>
             <p>"Choose a job you love, and you will never have to work a day in your life." — Confucius</p>
+            <form class="hero-search" id="heroSearchForm">
+                <input type="text" id="heroSearchInput" placeholder="Search job title, company or location...">
+                <button type="submit">Search</button>
+            </form>
+            <div class="hero-stats">
+                <div><b id="statJobs">–</b><span>Open Jobs</span></div>
+                <div><b id="statCompanies">–</b><span>Hiring Companies</span></div>
+            </div>
         </div>
     </section>
 
@@ -43,16 +52,11 @@
     <section class="section-container" id="jobs">
         <h3>Featured Career Openings</h3>
         
-        <div class="job-card">
-            <h4>Senior Frontend Developer</h4>
-            <div class="job-meta">TechCorp Solutions • Remote / Manila • Full-Time</div>
-            <p>Looking for an experienced developer proficient in modern JavaScript frameworks, UI/UX implementation, and responsive design systems.</p>
-        </div>
-
-        <div class="job-card">
-            <h4>Information Systems Analyst II</h4>
-            <div class="job-meta">TechSolutions Enterprise • Quezon City • Posted Yesterday</div>
-            <p>Maintains secure database architectures and ensures smooth integration across web portals and client systems.</p>
+        <p class="jobs-subtitle" id="jobsSubtitle">Loading the latest openings from WorkHive...</p>
+        <div class="job-grid" id="homeJobsList">
+            <div class="job-card skeleton"></div>
+            <div class="job-card skeleton"></div>
+            <div class="job-card skeleton"></div>
         </div>
     </section>
 
@@ -64,13 +68,14 @@
         </div>
     </section>
 
-    </main>
 
     <footer>
         <p>&copy; 2026 WorkHive. All rights reserved.</p>
         <p>Connecting talent with opportunity.</p>
     </footer>
 
-    <script src="homepage.js" ></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-client.js"></script>
+    <script src="homepage.js"></script>
 </body>
 </html>
