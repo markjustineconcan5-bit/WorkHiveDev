@@ -1,4 +1,3 @@
-
 const SUPABASE_URL = "https://dqekyrtibpnvaghogwsa.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRxZWt5cnRpYnBudmFnaG9nd3NhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg0NjcwMzUsImV4cCI6MjEwNDA0MzAzNX0.ggdaEHSheJZWfMpUYQN6I_HgB0qwvmnryKFKfMTvVhA";
 
